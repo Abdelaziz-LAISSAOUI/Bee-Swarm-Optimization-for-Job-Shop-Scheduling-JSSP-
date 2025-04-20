@@ -164,12 +164,76 @@ def bee_swarm_optimization(jobs, max_iter=1000, num_bees=50):
         best_makespan = best_mk
         if it%(max_iter/10) == 0 : 
             print("we are in ", it)
-    return best_makespan
+    return best_makespan, Sref
+
+
+# # --------------------- Gantt Chart ---------------------
+import matplotlib.pyplot as plt
+
+def generate_gantt_data(sequence, jobs):
+    nb_jobs = len(jobs)
+    nb_machines = max(max(op[0] for op in job) for job in jobs) + 1
+
+    job_indices = [0] * nb_jobs
+    job_available = [0] * nb_jobs
+    machine_available = [0] * nb_machines
+
+    gantt_data = []
+
+    for job_id in sequence:
+        op_idx = job_indices[job_id]
+        if op_idx >= len(jobs[job_id]):
+            continue
+
+        machine_id, duration = jobs[job_id][op_idx]
+        start_time = max(machine_available[machine_id], job_available[job_id])
+        end_time = start_time + duration
+
+        job_indices[job_id] += 1
+        machine_available[machine_id] = end_time
+        job_available[job_id] = end_time
+
+        gantt_data.append({
+            "Job": f"Job {job_id}",
+            "Machine": machine_id,
+            "Start": start_time,
+            "Duration": duration,
+            "End": end_time,
+            "Color": job_id
+        })
+
+    return gantt_data
+
+def plot_gantt(gantt_data):
+    fig, ax = plt.subplots(figsize=(16, 8))
+    yticks = []
+    yticklabels = []
+    colors = plt.cm.get_cmap('tab20', len(set([g['Job'] for g in gantt_data])))
+
+    for g in gantt_data:
+        y = g["Machine"]
+        ax.barh(y, g["Duration"], left=g["Start"], color=colors(g["Color"]), edgecolor='black')
+        ax.text(g["Start"] + g["Duration"] / 2, y, g["Job"], va='center', ha='center', fontsize=7, color='white')
+        if y not in yticks:
+            yticks.append(y)
+            yticklabels.append(f"Machine {y}")
+
+    ax.set_yticks(yticks)
+    ax.set_yticklabels(yticklabels)
+    ax.set_xlabel("Time")
+    ax.set_title("JSSP Gantt Chart (Matplotlib)")
+    ax.invert_yaxis()
+    plt.tight_layout()
+    plt.show()
+
+
 
 # # --------------------- Runner ---------------------
 
 if __name__ == "__main__":
     benchmarks = parse_multiple_job_shop_instances("data/tai20_15.txt")
-    for idx, instance in enumerate(benchmarks):
-        mk = bee_swarm_optimization(instance['jobs'], max_iter=3000, num_bees=20)
-        print(f"Benchmark {idx + 1}: Best Makespan = {mk}")
+    # for idx, instance in enumerate(benchmarks):
+    mk, best_seq = bee_swarm_optimization(benchmarks[0]['jobs'], max_iter=1000, num_bees=10)
+    print(f"Benchmark {1}: Best Makespan = {mk}")
+    
+    plot_gantt(generate_gantt_data(best_seq, benchmarks[0]['jobs']))
